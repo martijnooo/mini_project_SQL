@@ -23,7 +23,7 @@ def clean_movies_data(movies_df):
         movies_df['description'].str.contains(
             'alien|ufo|extraterrestrial|spaceship|spacecraft|cosmic|intergalactic|martian|extraterrestrials|galactic|asteroid|space|starship', 
             case=False, na=False), 
-        'yes', 'no'
+        1, 0
     )
     movies_df['date_added'] = pd.to_datetime(movies_df['date_added'], errors='coerce')
     movies_df = movies_df.dropna(subset=['date_added'])
@@ -82,3 +82,29 @@ def clean_subscriber_data(subscribers_df, countries_df):
     subscribers_df = subscribers_df.rename(columns={"country_code": "country_id"})
     
     return subscribers_df
+
+# Function to create a date index DataFrame and adjust dates in UFO and movies data
+def create_date_index(ufo_report_df, movies_df):
+    # Get unique entries from both columns
+    unique_dates_ufo = ufo_report_df["date"].unique()
+    unique_dates_movies = movies_df["date_added_formatted"].unique()
+
+    # Combine and get all unique entries
+    all_unique_dates = pd.unique(np.concatenate((unique_dates_ufo, unique_dates_movies)))
+
+    # Create a DataFrame for the date index
+    date_index_df = pd.DataFrame({
+        "date": all_unique_dates,
+        "date_id": range(len(all_unique_dates))
+    })
+
+    # Create a mapping of dates to their indices in all_unique_dates
+    date_to_index = {date: idx for idx, date in enumerate(all_unique_dates)}
+
+    # Replace dates in ufo_report_df["date"] with their corresponding indices
+    ufo_report_df["date_id"] = ufo_report_df["date"].map(date_to_index)
+
+    # Replace dates in movies_df["date_added_formatted"] with their corresponding indices
+    movies_df["date_id"] = movies_df["date_added_formatted"].map(date_to_index)
+
+    return ufo_report_df, movies_df, date_index_df
