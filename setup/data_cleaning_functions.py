@@ -1,9 +1,10 @@
 import pandas as pd
 import numpy as np
 import pycountry
+from helper.country_mapping import country_mapping
 
 # Function to create countries DataFrame
-def create_countries():
+def create_countries(population_df):
     def get_country_code(country_name):
         if isinstance(country_name, str):  # Check if it's a string
             country = pycountry.countries.get(name=country_name)
@@ -14,6 +15,17 @@ def create_countries():
     countries_name = [country.name for country in pycountry.countries]
     countries_df = pd.DataFrame({'handle': countries_short, 'name': countries_name}).reset_index()
     countries_df = countries_df.rename(columns={"index": "country_id"})
+
+    # merge with population
+    # first align names
+    population_df["Country Name"] = population_df["Country Name"].replace({
+    "Slovak Republic": "Slovakia",
+    "Turkiye": "Türkiye",
+    "Hong Kong SAR, China": "Hong Kong"})
+
+    countries_df = countries_df.merge(population_df, how="left", left_on="name", right_on="Country Name")
+    countries_df.drop(["Country Name", "Country Code"], axis=1, inplace=True)
+    countries_df.rename(columns={"Population":"population"}, inplace=True)
     return countries_df
 
 # Function to clean movies data
@@ -60,7 +72,10 @@ def clean_ufo_reports(ufo_report_df, countries_df):
     
     correct_format = r'^\d{1,2}/\d{4}$'
     ufo_report_df = ufo_report_df[ufo_report_df['date'].str.match(correct_format, na=False)]
+    ufo_report_df = ufo_report_df[ufo_report_df['date'].str.extract(r'(\d{4})')[0].astype(int) >= 1900]
     
+    
+    ufo_report_df["country"] = ufo_report_df["country"].replace(country_mapping)
     invalid_countries = ['no', 'unknown', 'none', 'not applicable', 'unknown/at sea', 'unavailable', 'in orbit', 'space', 'atlantic ocean', 'caribbean sea', 'pacific ocean', 'international space station', 'moon', 'mars', 'none', 'not found']
     ufo_report_df = ufo_report_df[~ufo_report_df['country'].str.lower().isin(invalid_countries)]
 
@@ -86,25 +101,32 @@ def clean_subscriber_data(subscribers_df, countries_df):
 # Function to create a date index DataFrame and adjust dates in UFO and movies data
 def create_date_index(ufo_report_df, movies_df):
     # Get unique entries from both columns
-    unique_dates_ufo = ufo_report_df["date"].unique()
-    unique_dates_movies = movies_df["date_added_formatted"].unique()
-
-    # Combine and get all unique entries
-    all_unique_dates = pd.unique(np.concatenate((unique_dates_ufo, unique_dates_movies)))
-
-    # Create a DataFrame for the date index
+    ufo_report_df["date"] = pd.to_datetime(ufo_report_df["date"], format="%m/%Y")
+    movies_df["date_added_formatted"] = pd.to_datetime(movies_df["date_added_formatted"], format="%m/%Y")
+# define time frame based on min and max dates given from both tables
+    min_date = min(ufo_report_df["date"].min(), movies_df["date_added_formatted"].min())
+    max_date = max(ufo_report_df["date"].max(), movies_df["date_added_formatted"].max())
+# Combine and get all dates
+    all_dates = pd.date_range(start=min_date, end=max_date, freq="MS")  # "MS" = month start
+# Create a DataFrame for the date index
     date_index_df = pd.DataFrame({
-        "date": all_unique_dates,
-        "date_id": range(len(all_unique_dates))
+        "date": all_dates.strftime("%m/%Y"),  # MM/YYYY-Format
+        "date_id": range(len(all_dates)),
+        "date_full": all_dates.strftime("%Y-%m-%d")  
     })
 
-    # Create a mapping of dates to their indices in all_unique_dates
-    date_to_index = {date: idx for idx, date in enumerate(all_unique_dates)}
+        # Create a mapping of dates to their indices in all_unique_dates
+    date_to_index = {date: idx for idx, date in enumerate(all_dates)}
 
     # Replace dates in ufo_report_df["date"] with their corresponding indices
     ufo_report_df["date_id"] = ufo_report_df["date"].map(date_to_index)
 
     # Replace dates in movies_df["date_added_formatted"] with their corresponding indices
     movies_df["date_id"] = movies_df["date_added_formatted"].map(date_to_index)
-
+# # Create a mapping of dates to their indices in all_dates
+#     date_to_index = {date: idx for idx, date in zip(date_index_df["date_id"], date_index_df["date"])}
+# # Replace dates in ufo_report_df["date"] with their corresponding indices
+#     ufo_report_df["date_id"] = ufo_report_df["date"].dt.strftime("%m/%Y").map(date_to_index)
+# # Replace dates in movies_df["date_added_formatted"] with their corresponding indices
+#     movies_df["date_id"] = movies_df["date_added_formatted"].dt.strftime("%m/%Y").map(date_to_index)
     return ufo_report_df, movies_df, date_index_df
