@@ -1,8 +1,7 @@
 # Import functions from data_cleaning_functions.py
 from data_cleaning_functions import create_countries, clean_movies_data, clean_ufo_reports, clean_subscriber_data, create_date_index
 import pandas as pd
-from sqlalchemy import create_engine, text
-from engine import get_engine 
+from sql_engine import get_engine 
 
 # Get the engine
 engine = get_engine()
@@ -32,21 +31,16 @@ if __name__ == "__main__":
         # Load event_dates DataFrame into the database
         date_index_df.columns = ['date', 'date_id']  # Rename columns to match SQL table
         date_index_df.to_sql('event_dates', schema="ufo_sightings", con=connection, if_exists='append', index=False)
-        # print("Data loaded into 'event_dates' table successfully.")
+        
+        # Load countries DataFrame into the database
+        countries_df.columns = ['country_id', "country_short", 'country']  # Rename columns to match SQL table
+        countries_df.to_sql('countries', schema="ufo_sightings", con=engine, if_exists='append', index=False)
 
-        # # Load countries DataFrame into the database
-        # countries_df.columns = ['country_id', "country_short", 'country']  # Rename columns to match SQL table
-        # countries_df.to_sql('countries', schema="ufo_sightings", con=engine, if_exists='append', index=False)
+        # Load movies DataFrame into the database
+        final_movies_df.to_sql('movies', con=connection, schema="ufo_sightings", if_exists='append', index=False)
+        
+        # Load UFO sightings DataFrame into the database
+        final_ufo_report_df.to_sql('ufo_sightings', con=connection, schema="ufo_sightings", if_exists='append', index=False)
 
-
-        # # Load movies DataFrame into the database
-        # final_movies_df.columns = ['movie_id', 'title', 'release_year']  # Rename columns to match SQL table
-        # final_movies_df.to_sql('movies', con=connection, if_exists='append', index=False)
-
-        # # Load UFO sightings DataFrame into the database
-        # final_ufo_report_df.columns = ['sighting_id', 'location', 'date', 'description']  # Rename columns to match SQL table
-        # final_ufo_report_df.to_sql('ufo_sightings', con=connection, if_exists='append', index=False)
-
-        # # Load subscribers DataFrame into the database
-        # final_subscribers_df.columns = ['subscriber_id', 'name', 'email', 'subscription_date']  # Rename columns to match SQL table
-        # final_subscribers_df.to_sql('subscribers', con=connection, if_exists='append', index=False)
+        # Load subscribers DataFrame into the database
+        final_subscribers_df.to_sql('subscribers', con=connection, schema="ufo_sightings", if_exists='append', index=False)
